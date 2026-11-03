@@ -137,7 +137,7 @@
   input[type=range] { width: 100%; margin: 0; height: 18px; }
   #fileInput { display: none; }
   .wm-box {
-    display: flex;
+    display: none !important;
     flex-direction: column;
     gap: 8px;
     padding: 8px;
@@ -179,7 +179,7 @@
 
     <div class="wm-box">
       <div class="wm-title">🏷️ Watermark</div>
-      <input type="text" id="watermarkInput" value="FactCues" placeholder="Watermark text" />
+      <input type="text" id="watermarkInput" value="" placeholder="Watermark text" />
       <div class="row">
         <label class="small"><span class="t"><span>Size</span><span><span id="wmSizeVal">26</span>px</span></span>
           <input type="range" id="wmSize" min="16" max="56" value="26" />
@@ -190,7 +190,7 @@
       </div>
       <div class="row">
         <button id="wmPosBtn">📍 Position: Top Right</button>
-        <button id="wmToggleBtn">👁️ Show: ON</button>
+        <button id="wmToggleBtn">👁️ Show: OFF</button>
       </div>
     </div>
   </div>
@@ -246,11 +246,11 @@
     centerY: null,
     cropW: null,
     cropH: null,
-    watermarkText: watermarkInput.value,
+    watermarkText: '',
     wmSize: 26,
     wmOpacity: 0.92,
     wmPos: 0,
-    wmVisible: true,
+    wmVisible: false,
     colorPalette: ['#FFD54F', '#FF5252', '#4FC3F7', '#66BB6A', '#FF6EC7', '#BA68C8'],
     wordColorIdx: [],      // -1 = auto, >= 0 = manual color from WORD_COLORS
     wordBoxes: []
