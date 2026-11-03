@@ -8,7 +8,7 @@
 <title>FactCues Post Maker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@500;700;800;900&family=Poppins:wght@500;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@500;700;800;900&family=Poppins:wght@500;700;800;900&family=Anton&display=swap" rel="stylesheet">
 <link href="fonts.css" rel="stylesheet">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -102,6 +102,7 @@
   }
   .row { display: flex; gap: 8px; }
   .ratio-row button { padding: 8px 4px; font-size: 12px; }
+  .mode-row button.active { background: #e53935; border-color: #e53935; }
   .ratio-row button.active { background: #1877F2; border-color: #1877F2; }
   button {
     flex: 1;
@@ -168,6 +169,11 @@
     </div>
     <input type="file" id="fileInput" accept="image/*" />
 
+    <div class="row ratio-row mode-row" id="modeRow">
+      <button data-m="classic" class="active">🌙 Classic</button>
+      <button data-m="top">⬆️ Top Text</button>
+    </div>
+
     <div class="row ratio-row" id="ratioRow">
       <button data-r="45" class="active">4:5</button>
       <button data-r="11">1:1</button>
@@ -183,6 +189,20 @@
       </label>
       <label class="small"><span class="t"><span>Zoom</span><span><span id="zoomVal">100</span>%</span></span>
         <input type="range" id="zoom" min="100" max="300" value="100" />
+      </label>
+    </div>
+
+    <div id="topControls" style="display:none; flex-direction:column; gap:8px;">
+      <div class="row">
+        <button id="topMinus">A− Chhota</button>
+        <button id="topPlus">A+ Bada</button>
+      </div>
+      <div class="row">
+        <button id="topFitBtn">↔️ Fit Lines: ON</button>
+        <button id="topShrinkBtn">📏 Auto Shrink: OFF</button>
+      </div>
+      <label class="small"><span class="t"><span>Line Gap</span><span><span id="topGapVal">1.2</span>x</span></span>
+        <input type="range" id="topGap" min="80" max="180" value="120" />
       </label>
     </div>
 
@@ -254,6 +274,14 @@
   const state = {
     image: null,
     splitRatio: 0.6,
+    mode: 'classic',
+    splitClassic: 0.6,
+    splitTop: 0.4,
+    topRed: [],
+    topFit: true,
+    topShrink: false,
+    topGap: 1.2,
+    imgH: 0,
     splitY: 0,
     fontSize: 52,
     text: factText.value,
@@ -299,6 +327,8 @@
     const count = getWordList(state.text).length;
     while (state.wordColorIdx.length < count) state.wordColorIdx.push(-1);
     state.wordColorIdx.length = count;
+    while (state.topRed.length < count) state.topRed.push(false);
+    state.topRed.length = count;
   }
   syncWordColors();
 
@@ -445,7 +475,142 @@
     ctx.restore();
   }
 
+  // ---- TOP TEXT layout: white text area on top, image below (4:5) ----
+  const TOP_FONT = '"Anton", "Noto Sans Devanagari", Impact, "Arial Narrow", sans-serif';
+  const TOP_MAX_BOOST = 1.3;
+
+  // Anton loaded? If not (offline), fall back to heavy system bold so text stays thick
+  function topWeight() {
+    ctx.font = '400 100px "Anton", monospace';
+    const a = ctx.measureText('MWmw').width;
+    ctx.font = '400 100px monospace';
+    const b = ctx.measureText('MWmw').width;
+    return Math.abs(a - b) > 0.5 ? 400 : 900;
+  }
+
+  function layoutTopLines(words, scale, maxWidth) {
+    const base = state.fontSize * scale;
+    ctx.font = `${topWeight()} ${base}px ${TOP_FONT}`;
+    const tokens = words.map((w, i) => ({ text: titleCaseWord(w, i, words.length) }));
+    const spaceW = ctx.measureText(' ').width;
+
+    // Manual line breaks (Enter in the text box): each paragraph wraps on its own
+    const breaks = getBreakCounts(state.text);
+    const lines = [];
+    let group = [], groupStart = 0;
+    const flush = () => {
+      if (!group.length) return;
+      wrapTokens(ctx, group, maxWidth).forEach(line => {
+        line.forEach(t => { t.wordIndex += groupStart; });
+        lines.push(line);
+      });
+      group = [];
+    };
+    tokens.forEach((tok, i) => {
+      if (i > 0 && breaks[i] > 0) {
+        flush();
+        for (let b = 1; b < breaks[i]; b++) lines.push([]); // blank line for extra Enter
+        groupStart = i;
+      }
+      group.push(tok);
+    });
+    flush();
+
+    return lines.map(line => {
+      if (!line.length) return { tokens: [], base, size: base * 0.6, wBase: 0, spaceW };
+      const wBase = line.reduce((sum, t, idx) => sum + t.width + (idx > 0 ? spaceW : 0), 0);
+      const fitSize = base * (maxWidth / Math.max(wBase, 1));
+      const size = state.topFit ? Math.min(base * TOP_MAX_BOOST, fitSize) : Math.min(base, fitSize);
+      return { tokens: line, base, size, wBase, spaceW };
+    });
+  }
+
+  // number of line breaks before each word (0 = same line)
+  function getBreakCounts(text) {
+    const out = [];
+    const re = /\S+/g;
+    let m, last = 0;
+    while ((m = re.exec(text)) !== null) {
+      const gap = text.slice(last, m.index);
+      out.push((gap.match(/\n/g) || []).length);
+      last = m.index + m[0].length;
+    }
+    return out;
+  }
+
+  function drawTopCard() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+
+    const splitY = Math.round(H * state.splitRatio);
+    state.splitY = splitY;
+    const imgH = H - splitY;
+    state.imgH = imgH;
+
+    // ---- IMAGE (bottom) ----
+    ctx.fillStyle = '#e9e9e9';
+    ctx.fillRect(0, splitY, W, imgH);
+    if (state.image) {
+      const img = state.image;
+      const targetRatio = W / imgH;
+      const imgRatio = img.width / img.height;
+      let baseW, baseH;
+      if (imgRatio > targetRatio) { baseH = img.height; baseW = baseH * targetRatio; }
+      else { baseW = img.width; baseH = baseW / targetRatio; }
+      const cropW = baseW / state.zoom;
+      const cropH = baseH / state.zoom;
+      state.centerX = Math.max(cropW / 2, Math.min(state.centerX, img.width - cropW / 2));
+      state.centerY = Math.max(cropH / 2, Math.min(state.centerY, img.height - cropH / 2));
+      state.cropW = cropW;
+      state.cropH = cropH;
+      ctx.drawImage(img, state.centerX - cropW / 2, state.centerY - cropH / 2, cropW, cropH, 0, splitY, W, imgH);
+    }
+
+    // ---- TEXT (top) ----
+    const words = getWordList(state.text);
+    state.wordBoxes = [];
+    if (words.length) {
+      const maxWidth = W - 120;
+      const availH = splitY - 50;
+      let scale = 1, lines = [], total = 0;
+      for (let k = 0; k < 14; k++) {
+        lines = layoutTopLines(words, scale, maxWidth);
+        total = lines.reduce((a, l) => a + l.size * state.topGap, 0);
+        if (!state.topShrink || total <= availH) break;
+        scale *= 0.92;
+      }
+      let y = total <= splitY ? (splitY - total) / 2 : 10;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      lines.forEach(l => {
+        const k = l.size / l.base;
+        const lineH = l.size * state.topGap;
+        const cy = y + lineH / 2 + l.size * 0.04;
+        const lineW = l.wBase * k;
+        const gap = l.spaceW * k;
+        ctx.font = `${topWeight()} ${l.size}px ${TOP_FONT}`;
+        let x = W / 2 - lineW / 2;
+        l.tokens.forEach(tok => {
+          const tw = tok.width * k;
+          ctx.fillStyle = state.topRed[tok.wordIndex] ? '#ff0000' : '#000000';
+          ctx.fillText(tok.text, x, cy);
+          state.wordBoxes.push({ wordIndex: tok.wordIndex, x: x, y: y, w: tw, h: lineH });
+          x += tw + gap;
+        });
+        y += lineH;
+      });
+    }
+
+    const displayRatio = container.clientHeight / H;
+    divider.style.top = (splitY * displayRatio) + 'px';
+    placeholderHint.style.top = (splitY * displayRatio) + 'px';
+    placeholderHint.style.height = (imgH * displayRatio) + 'px';
+    placeholderHint.style.display = state.image ? 'none' : 'flex';
+  }
+
   function drawCard() {
+    if (state.mode === 'top') { drawTopCard(); return; }
     ctx.clearRect(0, 0, W, H);
 
     ctx.fillStyle = '#000000';
@@ -542,7 +707,7 @@
   function ratioFromClientY(clientY) {
     const rect = container.getBoundingClientRect();
     const frac = (clientY - rect.top) / rect.height;
-    return Math.max(0.3, Math.min(0.8, frac));
+    return state.mode === 'top' ? Math.max(0.2, Math.min(0.7, frac)) : Math.max(0.3, Math.min(0.8, frac));
   }
   divider.addEventListener('pointerdown', (e) => {
     dragging = true;
@@ -573,6 +738,7 @@
     if (!box) return;
     // cycle: auto (-1) -> manual colors 0..n-1 -> back to auto
     const i = box.wordIndex;
+    if (state.mode === 'top') { state.topRed[i] = !state.topRed[i]; drawCard(); return; }
     const cur = state.wordColorIdx[i];
     state.wordColorIdx[i] = cur >= WORD_COLORS.length - 1 ? -1 : cur + 1;
     drawCard();
@@ -581,12 +747,13 @@
   canvas.addEventListener('pointerdown', (e) => {
     pointerStartClient = { x: e.clientX, y: e.clientY };
     const p = toCanvasCoords(e.clientX, e.clientY);
-    if (state.image && p.y < state.splitY) {
+    const inImg = state.mode === 'top' ? p.y >= state.splitY : p.y < state.splitY;
+    if (state.image && inImg) {
       imgDragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
       canvas.setPointerCapture(e.pointerId);
-    } else if (p.y >= state.splitY) {
+    } else if (!inImg) {
       textTapCandidate = true;
     }
   });
@@ -600,7 +767,7 @@
     lastY = e.clientY;
 
     const displayScale = rect.width / W;
-    const imgAreaH = state.splitY;
+    const imgAreaH = state.mode === 'top' ? state.imgH : state.splitY;
     const scaleFactorX = (state.cropW / W) / displayScale;
     const scaleFactorY = (state.cropH / imgAreaH) / displayScale;
 
@@ -706,7 +873,7 @@
   document.getElementById('saveBtn').addEventListener('click', () => {
     canvas.toBlob((blob) => {
       if (!blob) { toast('Save nahi ho paya'); return; }
-      const filename = 'FactCues_' + ratioName + '_' + Date.now() + '.png';
+      const filename = 'FactCues_' + (state.mode === 'top' ? 'top_' : '') + ratioName + '_' + Date.now() + '.png';
 
       // Android app: native bridge se gallery (Pictures/FactCues) mein save
       if (window.AndroidSave) {
@@ -748,12 +915,55 @@
     });
   });
 
+  document.querySelectorAll('#modeRow button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = btn.dataset.m;
+      if (m === state.mode) return;
+      if (state.mode === 'top') state.splitTop = state.splitRatio; else state.splitClassic = state.splitRatio;
+      state.mode = m;
+      state.splitRatio = (m === 'top') ? state.splitTop : state.splitClassic;
+      document.querySelectorAll('#modeRow button').forEach(b => b.classList.toggle('active', b === btn));
+      document.getElementById('ratioRow').style.display = (m === 'top') ? 'none' : 'flex';
+      document.querySelector('#ratioRow button[data-r="45"]').click();
+      fontSizeInput.min = (m === 'top') ? 30 : 20;
+      fontSizeInput.max = (m === 'top') ? 250 : 100;
+      document.getElementById('topControls').style.display = (m === 'top') ? 'flex' : 'none';
+      fontSizeInput.value = (m === 'top') ? 84 : 52;
+      fontSizeInput.dispatchEvent(new Event('input'));
+      drawCard();
+    });
+  });
+
+  function nudgeFont(d) {
+    const v = Math.max(+fontSizeInput.min, Math.min(+fontSizeInput.max, (+fontSizeInput.value) + d));
+    fontSizeInput.value = v;
+    fontSizeInput.dispatchEvent(new Event('input'));
+  }
+  document.getElementById('topMinus').addEventListener('click', () => nudgeFont(-4));
+  document.getElementById('topPlus').addEventListener('click', () => nudgeFont(4));
+  document.getElementById('topFitBtn').addEventListener('click', (e) => {
+    state.topFit = !state.topFit;
+    e.currentTarget.textContent = '↔️ Fit Lines: ' + (state.topFit ? 'ON' : 'OFF');
+    drawCard();
+  });
+  document.getElementById('topShrinkBtn').addEventListener('click', (e) => {
+    state.topShrink = !state.topShrink;
+    e.currentTarget.textContent = '📏 Auto Shrink: ' + (state.topShrink ? 'ON' : 'OFF');
+    drawCard();
+  });
+  document.getElementById('topGap').addEventListener('input', (e) => {
+    state.topGap = parseInt(e.target.value, 10) / 100;
+    document.getElementById('topGapVal').textContent = state.topGap.toFixed(2).replace(/0$/, '');
+    drawCard();
+  });
+
   window.addEventListener('resize', drawCard);
   window.addEventListener('load', drawCard);
   if (document.fonts && document.fonts.load) {
     Promise.all([
       document.fonts.load('700 52px "Noto Sans Devanagari"'),
-      document.fonts.load('700 52px "Poppins"')
+      document.fonts.load('700 52px "Poppins"'),
+      document.fonts.load('400 84px "Anton"')
     ]).catch(() => {}).then(drawCard);
   }
   if (document.fonts && document.fonts.ready) {
