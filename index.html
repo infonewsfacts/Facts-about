@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<title>FactCues Post Maker</title>
+<title>FactCues Love Tips Post Maker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@500;700;800;900&family=Poppins:wght@500;700;800;900&family=Anton&display=swap" rel="stylesheet">
@@ -78,7 +78,7 @@
   .divider .bar {
     width: 44px;
     height: 5px;
-    background: #4CAF50;
+    background: #ec407a;
     border-radius: 3px;
     box-shadow: 0 0 0 3px rgba(0,0,0,0.35);
   }
@@ -102,7 +102,7 @@
   }
   .row { display: flex; gap: 8px; }
   .ratio-row button { padding: 8px 4px; font-size: 12px; }
-  .mode-row button.active { background: #e53935; border-color: #e53935; }
+  .mode-row button.active { background: #ec407a; border-color: #ec407a; }
   .ratio-row button.active { background: #1877F2; border-color: #1877F2; }
   button {
     flex: 1;
@@ -115,8 +115,8 @@
     font-weight: 600;
   }
   button:active { background: #3a3a3a; }
-  button.primary { background: #4CAF50; border-color: #4CAF50; }
-  button.primary:active { background: #43a047; }
+  button.primary { background: #ec407a; border-color: #ec407a; }
+  button.primary:active { background: #d81b60; }
   textarea, input[type=text] {
     width: 100%;
     background: #1c1c1c;
@@ -153,14 +153,14 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>FactCues Post Maker</h1>
+  <h1>💞 FactCues • Relationship &amp; Dating Tips Maker</h1>
 
   <div class="canvas-container" id="canvasContainer">
     <canvas id="card" width="1080" height="1350"></canvas>
     <div class="placeholder-btn" id="placeholderHint">Neeche button se image select karein</div>
     <div class="divider" id="divider"><div class="bar"></div></div>
   </div>
-  <div class="hint">📌 Image drag karein • text ke word par tap karke color badlein (aakhri tap par auto)</div>
+  <div class="hint">📌 Image drag karein • divider ko upar-neeche karke text area adjust karein</div>
 
   <div class="controls">
     <div class="row">
@@ -181,7 +181,7 @@
       <button data-r="191">1.91:1</button>
     </div>
 
-    <textarea id="factText" placeholder="Yahan apna psychology fact likhein..."></textarea>
+    <textarea id="factText" placeholder="Yahan apna relationship / dating tip likhein... (Facebook post style: hook + emoji)"></textarea>
 
     <div class="row">
       <label class="small"><span class="t"><span>Font</span><span><span id="fontSizeVal">52</span>px</span></span>
@@ -251,33 +251,12 @@
   let ratioName = '4x5';
   const FONT_STACK = '"Noto Sans Devanagari", "Poppins", Arial, sans-serif';
 
-  // Colors available when manually tapping a word
-  const WORD_COLORS = ['#ffffff', '#ffeb3b', '#00e5ff', '#69f0ae', '#ff5252', '#ff9800', '#ea80fc'];
-
-  // Pronouns are never colored and never counted in the white/color alternation
-  const PRONOUNS = new Set([
-    'i','you','he','she','it','we','they','me','him','her','us','them',
-    'my','your','his','its','our','their','mine','yours','hers','ours','theirs',
-    'myself','yourself','himself','herself','itself','ourselves','yourselves','themselves',
-    'who','whom','whose','which','what','whoever','whomever','whichever','whatever',
-    'anyone','anybody','anything','someone','somebody','something','nobody','nothing',
-    'each','either','neither','one','another','other','others','few','many','several',
-    'all','both','some','any','none',
-    'मैं','मै','मुझे','मुझ','मेरा','मेरी','मेरे','हम','हमें','हमारा','हमारी','हमारे',
-    'तू','तुम','तुझे','तुम्हें','तुम्हारा','तुम्हारी','तुम्हारे','तेरा','तेरी','तेरे',
-    'आप','आपको','आपका','आपकी','आपके',
-    'वह','वो','वे','उसे','उन्हें','उसका','उसकी','उसके','उनका','उनकी','उनके','उन',
-    'यह','ये','इसे','इन्हें','इसका','इसकी','इसके','इनका','इनकी','इनके','इन','इस','उस',
-    'कौन','क्या','किसे','किसका','किसकी','किसके','कोई','कुछ','सब','सभी','खुद','अपना','अपनी','अपने'
-  ]);
-
   const state = {
     image: null,
     splitRatio: 0.6,
     mode: 'classic',
     splitClassic: 0.6,
     splitTop: 0.4,
-    topRed: [],
     topFit: true,
     topShrink: false,
     topGap: 1.2,
@@ -294,10 +273,7 @@
     wmSize: 26,
     wmOpacity: 0.92,
     wmPos: 0,
-    wmVisible: false,
-    colorPalette: ['#FFD54F', '#FF5252', '#4FC3F7', '#66BB6A', '#FF6EC7', '#BA68C8'],
-    wordColorIdx: [],      // -1 = auto, >= 0 = manual color from WORD_COLORS
-    wordBoxes: []
+    wmVisible: false
   };
 
   // ---- Title Case (display only) ----
@@ -323,43 +299,9 @@
     return (text.match(/\S+/g) || []);
   }
 
-  function syncWordColors() {
-    const count = getWordList(state.text).length;
-    while (state.wordColorIdx.length < count) state.wordColorIdx.push(-1);
-    state.wordColorIdx.length = count;
-    while (state.topRed.length < count) state.topRed.push(false);
-    state.topRed.length = count;
-  }
-  syncWordColors();
-
-  function normWord(w) {
-    return w.toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
-  }
-
-  function isPronoun(word) {
-    return PRONOUNS.has(normWord(word));
-  }
-
   function buildTokens(text) {
     const words = getWordList(text);
-    const palette = state.colorPalette;
-    let colorCounter = 0;
-    let paletteIndex = 0;
-
-    return words.map((w, i) => {
-      // Auto color always computed so manual overrides don't shift the rhythm
-      let autoColor = '#ffffff';
-      if (!isPronoun(w)) {
-        if (colorCounter % 2 === 1) {
-          autoColor = palette[paletteIndex % palette.length];
-          paletteIndex++;
-        }
-        colorCounter++;
-      }
-      const manual = state.wordColorIdx[i];
-      const color = manual >= 0 ? WORD_COLORS[manual % WORD_COLORS.length] : autoColor;
-      return { text: titleCaseWord(w, i, words.length), color };
-    });
+    return words.map((w, i) => ({ text: titleCaseWord(w, i, words.length), color: '#ffffff' }));
   }
 
   function wrapTokens(context, tokens, maxWidth) {
@@ -569,7 +511,6 @@
 
     // ---- TEXT (top) ----
     const words = getWordList(state.text);
-    state.wordBoxes = [];
     if (words.length) {
       const maxWidth = W - 120;
       const availH = splitY - 50;
@@ -593,9 +534,8 @@
         let x = W / 2 - lineW / 2;
         l.tokens.forEach(tok => {
           const tw = tok.width * k;
-          ctx.fillStyle = state.topRed[tok.wordIndex] ? '#ff0000' : '#000000';
+          ctx.fillStyle = '#000000';
           ctx.fillText(tok.text, x, cy);
-          state.wordBoxes.push({ wordIndex: tok.wordIndex, x: x, y: y, w: tw, h: lineH });
           x += tw + gap;
         });
         y += lineH;
@@ -676,7 +616,6 @@
     const textAreaCenterY = splitY + (textAreaH - wmReserve) / 2;
     const startY = textAreaCenterY - totalTextHeight / 2 + lineHeight / 2;
 
-    state.wordBoxes = [];
     lines.forEach((line, i) => {
       const lineWidth = line.reduce((sum, t, idx) => sum + t.width + (idx > 0 ? spaceWidth : 0), 0);
       let x = W / 2 - lineWidth / 2;
@@ -684,10 +623,6 @@
       line.forEach(tok => {
         ctx.fillStyle = tok.color;
         ctx.fillText(tok.text, x, y);
-        state.wordBoxes.push({
-          wordIndex: tok.wordIndex,
-          x: x, y: y - lineHeight / 2, w: tok.width, h: lineHeight
-        });
         x += tok.width + spaceWidth;
       });
     });
@@ -724,8 +659,6 @@
   // ---- Canvas pointer handling ----
   let imgDragging = false;
   let lastX = 0, lastY = 0;
-  let textTapCandidate = false;
-  let pointerStartClient = { x: 0, y: 0 };
 
   function toCanvasCoords(clientX, clientY) {
     const rect = container.getBoundingClientRect();
@@ -733,19 +666,7 @@
     return { x: (clientX - rect.left) * scale, y: (clientY - rect.top) * scale };
   }
 
-  function handleWordTap(cx, cy) {
-    const box = state.wordBoxes.find(b => cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h);
-    if (!box) return;
-    // cycle: auto (-1) -> manual colors 0..n-1 -> back to auto
-    const i = box.wordIndex;
-    if (state.mode === 'top') { state.topRed[i] = !state.topRed[i]; drawCard(); return; }
-    const cur = state.wordColorIdx[i];
-    state.wordColorIdx[i] = cur >= WORD_COLORS.length - 1 ? -1 : cur + 1;
-    drawCard();
-  }
-
   canvas.addEventListener('pointerdown', (e) => {
-    pointerStartClient = { x: e.clientX, y: e.clientY };
     const p = toCanvasCoords(e.clientX, e.clientY);
     const inImg = state.mode === 'top' ? p.y >= state.splitY : p.y < state.splitY;
     if (state.image && inImg) {
@@ -753,8 +674,6 @@
       lastX = e.clientX;
       lastY = e.clientY;
       canvas.setPointerCapture(e.pointerId);
-    } else if (!inImg) {
-      textTapCandidate = true;
     }
   });
 
@@ -781,18 +700,9 @@
     if (imgDragging) {
       imgDragging = false;
       try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
-      return;
-    }
-    if (textTapCandidate) {
-      textTapCandidate = false;
-      const moved = Math.hypot(e.clientX - pointerStartClient.x, e.clientY - pointerStartClient.y);
-      if (moved < 8) {
-        const p = toCanvasCoords(e.clientX, e.clientY);
-        handleWordTap(p.x, p.y);
-      }
     }
   });
-  canvas.addEventListener('pointercancel', () => { imgDragging = false; textTapCandidate = false; });
+  canvas.addEventListener('pointercancel', () => { imgDragging = false; });
 
   document.getElementById('pickImageBtn').addEventListener('click', () => fileInput.click());
 
@@ -818,7 +728,6 @@
 
   factText.addEventListener('input', () => {
     state.text = factText.value;
-    syncWordColors();
     drawCard();
   });
   fontSizeInput.addEventListener('input', () => {
